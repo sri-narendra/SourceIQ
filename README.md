@@ -209,6 +209,13 @@ Keys for Groq, Mistral, OpenRouter, Gemini, NVIDIA live in `backend/.env`. Verif
 
 ### Option A — local (needs Postgres)
 
+```powershell
+# Windows (works with a single command):
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
+```
+
+Or step by step (run from repo root):
+
 ```bash
 cd backend
 python -m virtualenv .venv
@@ -216,7 +223,9 @@ python -m virtualenv .venv
 pip install -r requirements.txt
 cp .env.example .env        # set DATABASE_URL, AWS keys
 cd ..                        # run from repo root (sibling packages ai/, storage/, ...)
-uvicorn backend.main:app --app-dir backend --reload   # http://localhost:8000/docs
+# NOTE: use `python -m uvicorn`, NOT bare `uvicorn` — the module form adds the
+# repo root to sys.path so `import backend.main` resolves.
+python -m uvicorn backend.main:app --app-dir backend --reload   # http://localhost:8000/docs
 ```
 
 ```bash
