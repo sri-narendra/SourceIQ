@@ -191,7 +191,17 @@ cd backend
 .\.venv\Scripts\python -m ruff format .    # formatted
 ```
 
-Import smoke test confirmed all modules load and the app registers 18 routes.
+Import smoke test confirmed all modules load and the app registers 18 routes. End-to-end verify (with a running DB): `register` → row in `users`, `login` → JWT, `GET /workspaces` with bearer → `200`.
+
+### 10. API keys (`.env`)
+
+Keys for Groq, Mistral, OpenRouter, Gemini, NVIDIA live in `backend/.env`. Verified working: **Groq, Mistral, OpenRouter, Gemini**; NVIDIA key is valid (slow generation). `backend/.env` is gitignored — never commit it.
+
+### 11. Key settings fixes for local run
+
+- `settings.py` loads `backend/.env` **relative to the file**, not CWD — the backend runs from the repo root.
+- Docker DB uses `pgvector/pgvector:pg16` on host port **5433** ([5432 is taken by a local pgvector container]).
+- `docker compose down -v` once after a failed first boot to clear a corrupt init volume.
 
 ---
 
@@ -222,9 +232,13 @@ npm run dev
 docker compose up --build
 ```
 
-Starts Postgres 16 (with pgvector), the FastAPI backend, and the Next.js frontend.
+Starts Postgres 16 with pgvector, the FastAPI backend, and the Next.js frontend.
 
-> Compose config validates; image builds are unverified here (Docker Desktop daemon was stopped). Run `docker compose up --build` to confirm.
+> Notes:
+> - DB maps to host port **5433** (5432 is commonly taken by other containers), and `backend/.env` sets `DATABASE_URL=...5433/ai_knowledge`.
+> - Use the `pgvector/pgvector:pg16` image (base `postgres:16` lacks the `vector` extension).
+> - `backend/config/settings.py` loads `backend/.env` **relative to the file**, so the backend runs correctly from the repo root.
+> - Compose config validates; restart Docker Desktop if the daemon isn't running.
 
 ---
 
