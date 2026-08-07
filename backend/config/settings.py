@@ -1,4 +1,9 @@
+import os
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -42,7 +47,7 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": _BACKEND_DIR / ".env", "extra": "ignore"}
 
 
 settings = Settings()
