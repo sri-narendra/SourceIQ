@@ -2,7 +2,7 @@
 
 Enterprise RAG SaaS — upload documents, chat with them via AI, get answers with source citations.
 
-Stack: Next.js 15 + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS/CloudWatch) + Gemini/Groq/vLLM.
+Stack: Next.js 15 + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS/CloudWatch) + Gemini/Groq/OpenAI/Mistral/NVIDIA/OpenRouter/vLLM.
 
 **Layer responsibilities:**
 - `frontend/` — user-facing UI (auth, dashboard, upload, chat)
@@ -65,7 +65,7 @@ projectv1/
 │   ├── retrieval/             # Vector search + source formatting
 │   ├── generation/            # LLM answer generation per provider
 │   ├── prompts/               # Prompt templates
-│   └── models/                # LLM provider registry (gemini/groq/vllm/ollama)
+│   └── models/                # LLM provider registry (gemini/groq/openai/mistral/nvidia/openrouter/vllm/ollama)
 │
 ├── storage/                   # AWS S3 utilities
 │   ├── s3/                    # S3 client (upload/download/delete/URLs)
@@ -140,7 +140,7 @@ Files: `config/settings.py`, `main.py`, `schemas/contracts.py`, `middleware/auth
 - `ai/embeddings/providers.py` — Gemini/OpenAI + deterministic local fallback.
 - `ai/chunking/chunker.py` & `text_extractor.py` — PDF/DOCX/TXT → chunks.
 - `ai/retrieval/retriever.py` — cosine search (swap for pgvector HNSW later).
-- `ai/generation/generator.py` — per-provider generation, local fallback when no API key.
+- `ai/generation/generator.py` — per-provider generation (Gemini, Groq, OpenAI-compatible: OpenAI/Mistral/NVIDIA/OpenRouter, plus local vLLM/Ollama), local fallback when no API key.
 - `ai/prompts/prompts.py`, `ai/models/registry.py`.
 
 ### 5. Storage + queueing
@@ -271,6 +271,9 @@ SQS_QUEUE_URL
 GEMINI_API_KEY
 GROQ_API_KEY
 OPENAI_API_KEY
+MISTRAL_API_KEY
+NVIDIA_API_KEY
+OPENROUTER_API_KEY
 REDIS_URL
 ```
 

@@ -20,6 +20,12 @@ def resolve_llm(provider: str | None = None, model: str | None = None) -> LLMMod
         return LLMModel("groq", model or "llama-3.1-8b-instant")
     if p == "openai":
         return LLMModel("openai", model or "gpt-4o-mini")
+    if p == "mistral":
+        return LLMModel("mistral", model or "mistral-large-latest", settings.mistral_base_url)
+    if p == "nvidia":
+        return LLMModel("nvidia", model or "meta/llama-3.3-70b-instruct", settings.nvidia_base_url)
+    if p == "openrouter":
+        return LLMModel("openrouter", model or "openai/gpt-4o-mini", settings.openrouter_base_url)
     if p == "vllm":
         return LLMModel("vllm", model or "meta-llama/Meta-Llama-3-8B-Instruct", settings.vllm_base_url)
     if p == "ollama":

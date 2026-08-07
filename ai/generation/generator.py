@@ -16,6 +16,9 @@ def generate_answer(question: str, context: str, provider: str | None = None) ->
         "gemini": settings.gemini_api_key,
         "groq": settings.groq_api_key,
         "openai": settings.openai_api_key,
+        "mistral": settings.mistral_api_key,
+        "nvidia": settings.nvidia_api_key,
+        "openrouter": settings.openrouter_api_key,
     }.get(llm.provider)
     if llm.provider in ("vllm", "ollama") and not llm.base_url:
         return _local(llm, prompt)
@@ -26,8 +29,8 @@ def generate_answer(question: str, context: str, provider: str | None = None) ->
         return _gemini(llm, prompt)
     if llm.provider == "groq":
         return _groq(llm, prompt)
-    if llm.provider == "openai":
-        return _openai(llm, prompt)
+    if llm.provider in ("openai", "mistral", "nvidia", "openrouter"):
+        return _openai_compatible(llm, prompt)
     return _local(llm, prompt)
 
 
@@ -60,12 +63,18 @@ def _groq(llm, prompt):
     return resp.choices[0].message.content
 
 
-def _openai(llm, prompt):
+def _openai_compatible(llm, prompt):
     from config.settings import settings
 
     import openai
 
-    client = openai.OpenAI(api_key=settings.openai_api_key, base_url=llm.base_url)
+    key = {
+        "openai": settings.openai_api_key,
+        "mistral": settings.mistral_api_key,
+        "nvidia": settings.nvidia_api_key,
+        "openrouter": settings.openrouter_api_key,
+    }[llm.provider]
+    client = openai.OpenAI(api_key=key, base_url=llm.base_url)
     resp = client.chat.completions.create(
         model=llm.model_id,
         messages=[{"role": "user", "content": prompt}],
