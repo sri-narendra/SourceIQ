@@ -224,6 +224,8 @@ docker compose up --build
 
 Starts Postgres 16 (with pgvector), the FastAPI backend, and the Next.js frontend.
 
+> Compose config validates; image builds are unverified here (Docker Desktop daemon was stopped). Run `docker compose up --build` to confirm.
+
 ---
 
 ## Deployment
@@ -248,10 +250,10 @@ NEXTAUTH_URL
 ### Backend (Render + Docker)
 
 1. In Render create a web service from the repo.
-2. Build/start Dockerfile: `docker/Dockerfile.backend`.
+2. Build/start Dockerfile: `docker/Dockerfile.backend` (copies the whole repo — the app imports sibling packages `ai/`, `storage/`, `queueing/`).
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port $PORT
+uvicorn backend.main:app --app-dir backend --host 0.0.0.0 --port $PORT
 ```
 
 3. Add env vars:
@@ -288,4 +290,4 @@ Deploy `workers/document_worker/main.py` as a background worker on Render (or ru
 
 ### CI/CD
 
-`.github/workflows/` is scaffolded for GitHub Actions (push → lint, test, deploy).
+`.github/workflows/` is an (empty) scaffold — add a GitHub Actions workflow (e.g. push → `npm run build` on frontend, `pytest` + `ruff` on backend → deploy) when ready.
