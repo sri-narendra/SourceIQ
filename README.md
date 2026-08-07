@@ -20,17 +20,19 @@ Stack: Next.js 15 + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS/CloudWatch) + Ge
 ```
 projectv1/
 ├── frontend/                  # Next.js 15 + React + TypeScript + Tailwind (Vercel)
-│   ├── app/                   # App Router pages & layouts
-│   ├── components/            # Reusable UI components
-│   ├── features/              # Feature-specific UI (upload, chat, search, dashboard)
-│   ├── hooks/                 # React hooks (useAuth, useChat, useDocuments)
-│   ├── lib/                   # Third-party client setup (TanStack Query, etc.)
-│   ├── services/              # API clients (axios + per-resource endpoints)
-│   ├── types/                 # Shared TypeScript interfaces
-│   ├── constants/             # App constants (file limits, chunk sizes)
-│   ├── utils/                 # Frontend helpers
-│   ├── styles/                # Global styles / Tailwind config
-│   └── public/                # Static assets
+│   ├── src/app/               # App Router pages & layouts
+│   ├── src/components/        # Reusable UI components
+│   ├── src/features/          # Feature-specific UI (upload, chat, search, dashboard)
+│   ├── src/hooks/             # React hooks (useAuth, useChat, useDocuments)
+│   ├── src/lib/               # Third-party client setup (TanStack Query, etc.)
+│   ├── src/services/          # API clients (axios + per-resource endpoints)
+│   ├── src/types/             # Shared TypeScript interfaces
+│   ├── src/constants/         # App constants (file limits, chunk sizes)
+│   ├── src/utils/             # Frontend helpers
+│   ├── src/styles/            # Global styles / Tailwind config
+│   ├── public/                # Static assets
+│   ├── tsconfig.json          # create-next-app: strict, @/* alias
+│   └── eslint.config.mjs      # create-next-app: ESLint 9 flat config
 │
 ├── backend/                   # FastAPI + SQLAlchemy (Render/Docker)
 │   ├── main.py                # App entrypoint, CORS, health check
@@ -105,9 +107,10 @@ Short-form build steps followed to create this project, plus the files created/e
 
 ```bash
 mkdir projectv1 && cd projectv1
+git init
 ```
 
-Created root files: `README.md`, `LICENSE` (MIT), `.gitignore`, `docker-compose.yml`.
+Created root files: `README.md`, `LICENSE` (MIT), `.gitignore`, `.dockerignore`, `docker-compose.yml`.
 
 ### 2. Create module folders
 
@@ -119,14 +122,18 @@ Created root files: `README.md`, `LICENSE` (MIT), `.gitignore`, `docker-compose.
 
 ```bash
 cd backend
+python -m virtualenv .venv          # if `python -m venv` is unavailable
+.\.venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload   # http://localhost:8000/docs
 ```
 
 Files: `config/settings.py`, `main.py`, `schemas/contracts.py`, `middleware/auth.py`, `database/session.py`, `models/entities.py`.
 
 - `services/auth_service.py` — bcrypt + JWT (swapped out `passlib` — incompatible with bcrypt ≥ 4.1).
 - 18 routes across `api/` (auth, workspaces, documents, chat, search, dashboard, users).
+- Added `email-validator` (pydantic requires it for `EmailStr`).
+- Loosened `langchain-google-genai`/`google-generativeai` pins — the tight pair conflicted on dependency resolution.
+- `/` and the backend imports sibling root packages (`ai/`, `storage/`, `queueing/`), so it must run **from the repo root**: `uvicorn backend.main:app --app-dir backend`.
 
 ### 4. AI / RAG pipeline
 
@@ -160,23 +167,28 @@ python -m workers.document_worker.main
 - `database/migrations/001_init.sql` — all 10 tables + pgvector HNSW index.
 - `database/seed/001_demo_user.sql` — demo user.
 
-### 8. Frontend
+### 8. Frontend — production scaffold with a real command
 
 ```bash
-cd frontend
-npm install
-npm run dev               # http://localhost:3000
+npx create-next-app@latest frontend --ts --tailwind --eslint --app --import-alias "@/*" --use-npm
+npm install axios
 ```
 
-- `types/index.ts`, `services/api.ts` (axios) + `services/api-endpoints.ts`.
-- `hooks/useAuth.ts`, `hooks/useChat.ts`, `hooks/useDocuments.ts`.
-- `app/layout.tsx`, `app/page.tsx`, `constants/app.ts`, `utils/helpers.ts`.
+The App Router scaffold generates `src/app/`, `tsconfig.json`, Tailwind/ESLint/PostCSS config, and a lint/build toolchain. Our typed files were layered on top under `src/`: `types/index.ts`, `services/api.ts` (axios) + `api-endpoints.ts`, `hooks/useAuth.ts`, `useChat.ts`, `useDocuments.ts`, `constants/app.ts`, `utils/helpers.ts`.
+
+```bash
+npm run dev       # http://localhost:3000
+npm run build     # verified: static build passes
+npx tsc --noEmit  # typecheck clean
+```
 
 ### 9. Verify
 
 ```bash
 cd backend
-python -m py_compile $(find . -name "*.py")
+.\.venv\Scripts\python -m pytest -q        # 3 passed
+.\.venv\Scripts\python -m ruff check .     # clean
+.\.venv\Scripts\python -m ruff format .    # formatted
 ```
 
 Import smoke test confirmed all modules load and the app registers 18 routes.
@@ -189,9 +201,12 @@ Import smoke test confirmed all modules load and the app registers 18 routes.
 
 ```bash
 cd backend
+python -m virtualenv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env        # set DATABASE_URL, AWS keys
-uvicorn main:app --reload
+cd ..                        # run from repo root (sibling packages ai/, storage/, ...)
+uvicorn backend.main:app --app-dir backend --reload   # http://localhost:8000/docs
 ```
 
 ```bash
