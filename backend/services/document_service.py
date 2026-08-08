@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from storage.s3.client import s3_client
 
 from config.settings import settings
-from models.entities import DocumentStatus
+from models.entities import DocumentStatus, ProcessingJob
 from repositories.base import DocumentRepository
 
 log = logging.getLogger("document_service")
@@ -106,6 +106,7 @@ class DocumentService:
             return False
         if doc.s3_key:
             s3_client.delete(doc.s3_key)
+        self.repo.db.query(ProcessingJob).filter_by(document_id=document_id).delete()
         self.repo.db.delete(doc)
         self.repo.db.commit()
         return True
