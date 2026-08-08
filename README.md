@@ -18,7 +18,8 @@ Stack: Next.js + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS) + Gemini/Groq/Open
 - **40+ upload formats** — plain text/code, Markdown, CSV, JSON, XML, Office (docx/pptx/xlsx/odt), PDF, and OCR'd images
 - **OCR** — scanned PDFs (no text layer) fall back to RapidOCR per page; images (png/jpg/jpeg/bmp/tif/tiff/webp) are OCR'd directly
 - **Document status in UI** — sidebar shows per-doc status (`uploading → processing → completed/failed`) and polls while processing
-- **Delete anywhere** — workspaces, documents, and chats each have a one-click ✕ delete
+- **Delete anywhere** — workspaces, documents, and chats each have a one-click ✕ delete (doc delete purges the full row graph + S3 object)
+- **Reliable async worker** — uploads fire a debounced `workflow_dispatch` (≤1 per 45 s, so bursts coalesce into one run); the one-shot worker keeps polling until the queue is empty, processing up to 4 docs in parallel with per-stage timing logs
 - **Multi-file upload** — select several files at once; per-file errors surfaced in the UI
 - **Log out** — clears the session token and returns to the login page
 - **Neo-brutalist UI** — hard ink borders, offset shadows, halftone paper, marquee ticker (landing), stamped status chips (dashboard)
@@ -58,7 +59,7 @@ projectv1/
 │   ├── generation/        # per-provider LLM answers (works keyless: deterministic fallback)
 │   └── models/            # LLM provider registry (gemini/groq/openai/mistral/nvidia/openrouter/vllm/ollama)
 ├── workers/                  # background pipeline (SQS-polling)
-│   ├── document_worker/    # download → extract → chunk → embed → store
+│   ├── document_worker/    # download → extract → chunk → embed → store (4-thread parallel, debounced dispatch, full-queue drain)
 │   ├── embedding_worker/   # re-embed / retry logic
 │   ├── notification_worker/
 │   └── cleanup_worker/
@@ -342,7 +343,7 @@ docker run -d --pull always --restart unless-stopped \
   sourceiq-backend python -m workers.document_worker.main
 ```
 
-(`workers/document_worker/main.py` polls `receive_document_jobs()` in a loop; the same backend image works as this worker.) Until a worker runs, documents stay stuck in `processing` — that is expected with SQS enabled and by design.
+(`workers/document_worker/main.py` polls `receive_document_jobs()` in a loop; the same backend image works as this worker; each `--once` pass drains the queue fully with up to 4 threads). Until a worker runs, documents stay stuck in `processing` — that is expected with SQS enabled and by design. On Render+GitHub Actions the backend auto-fires a debounced `workflow_dispatch` per upload (and a `*/5` cron is the safety net), so the managed worker wakes on demand instead of relying only on cron.
 
 **Option B2b — EC2 `t3.micro` (AWS-native compute, 12-month free tier):**
 

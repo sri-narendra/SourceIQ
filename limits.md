@@ -65,10 +65,9 @@ Verified facts about the deployed SourceIQ platform (frontend on Vercel, backend
 | Metric | Value |
 | --- | --- |
 | Registered users | 1 (owner of the `test` workspace) |
-| Workspaces | 1 (`test`) |
-| Documents uploaded | 12 |
-| Documents completed | 9 (of 12; 3 in `processing` at measure time) |
-| Conversations | 3 |
+| Workspaces | 22 |
+| Documents uploaded | 9 (all completed) |
+| Conversations | 15 |
 | S3 objects | 13 |
 | S3 bytes | 1,836,868 B ≈ **1.75 MB** |
 | Avg object size | ~ 141 KB |
@@ -92,12 +91,14 @@ Verified facts about the deployed SourceIQ platform (frontend on Vercel, backend
 | --- | --- |
 | Max batch | 10 messages / poll |
 | Worker parallelism | **4 threads** per worker pass |
+| Dispatch budget | **1 `workflow_dispatch` per 45 s**, debounced (`document_service.py`) — a burst of uploads coalesces into one run |
+| One-shot exhaust | worker `run(once=True)` keeps polling until the batch is empty, so a single dispatch fully drains the queue — no mid-batch waits |
 | Visibility timeout | 30 s |
 | Message retention | 4 days (345,600 s) |
 | Max message size | 1 MB (1,048,576 B) |
 | Long-poll wait | 1 s |
 | Free allowance | 1 M requests / month |
-| Wake-up | instant `workflow_dispatch` per upload + `*/5` cron safety |
+| Wake-up | instant `workflow_dispatch` per upload (debounced) + `*/5` cron safety |
 
 ### Embeddings / inference
 
@@ -123,7 +124,8 @@ Verified facts about the deployed SourceIQ platform (frontend on Vercel, backend
 
 - **Throughput**: load-tested to **20 concurrent VUs**, `p(95) < 1000 ms`, error rate < 1%.
 - **Retriever** is O(n) cosine over the workspace's embeddings, cut to `top_k`. Cost grows with chunks per workspace; the code comments flag a pgvector HNSW swap when doc counts grow.
-- **Worker**: GitHub Actions runner ~2-core; each pass = fresh checkout + pip install (~30–45 s cold start) then parallel doc processing.
+- **Worker**: GitHub Actions runner ~2-core; each pass = fresh checkout (pip cached, `~/.cache/pip` keyed on requirements hash — cache hit ≈ 243 MB) + pip install (~30–45 s cold start) then parallel doc processing. Per-stage timing is logged (download/extract, embed, total) so slow stages show up directly in the run log.
+- **Delete** is verified to purge the full row graph: `ProcessingJob` → `Document` → `DocumentChunk` → `Embedding` all cleared (ORM `cascade="all, delete-orphan"`), plus the S3 object. Confirmed with a DB-level delete+count test → 0 rows in every child table afterwards.
 - **Render free instance** sleeps after ~50 s idle; first request may add ~50 s cold start.
 - **DB scale**: Neon free-tier Postgres is the practical cap (IOV + storage allowance) before billing.
 - **Free-tier math for $0**: ~200 K file uploads/mo (S3 PUTS), ~333 K doc jobs/mo (SQS 1 M ÷ 3 msgs), 5 GB storage, 5 GB CloudWatch logs → first-exceeded allowance bills; budget auto-stops AWS access at $1.
