@@ -117,14 +117,17 @@ def run(once: bool = False):
 
     while True:
         messages = receive_document_jobs()
-        if messages:
-            # ponytail: batch the run's messages into a thread pool; SQS draining is
-            # latency-bound (embedding calls), so parallelize up to 4 at a time.
-            with ThreadPoolExecutor(max_workers=4) as pool:
-                list(pool.map(_process_and_delete, messages))
-        if once:
-            break
-        time.sleep(1)
+        if not messages:
+            # ponytail: queue is empty — a one-shot run is done; a long-running
+            # worker keeps polling.
+            if once:
+                return
+            time.sleep(1)
+            continue
+        # ponytail: batch the run's messages into a thread pool; SQS draining is
+        # latency-bound (embedding calls), so parallelize up to 4 at a time.
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(_process_and_delete, messages))
 
 
 if __name__ == "__main__":

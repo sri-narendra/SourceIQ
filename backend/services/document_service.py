@@ -1,5 +1,7 @@
 import json
 import logging
+import threading
+import time
 import uuid
 from threading import Thread
 from urllib.request import Request, urlopen
@@ -14,10 +16,23 @@ from repositories.base import DocumentRepository
 
 log = logging.getLogger("document_service")
 
+# Debounce dispatches: GitHub's concurrency group cancels overlapping queued
+# runs, so a burst of uploads must coalesce into ONE worker run. Fire at most
+# once per DISPATCH_DEBOUNCE_SECONDS; the single run drains the whole queue.
+_DISPATCH_DEBOUNCE_SECONDS = 45
+_dispatch_lock = threading.Lock()
+_last_dispatch_ts = 0.0
+
 
 def _dispatch_worker():
+    global _last_dispatch_ts
     if not settings.github_token:
         return  # no token configured — rely on the 5-min cron
+    with _dispatch_lock:
+        now = time.time()
+        if now - _last_dispatch_ts < _DISPATCH_DEBOUNCE_SECONDS:
+            return
+        _last_dispatch_ts = now
     body = json.dumps({"ref": "master"}).encode()
     req = Request(
         f"https://api.github.com/repos/{settings.github_repo}/actions/workflows/"
