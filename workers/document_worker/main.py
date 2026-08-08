@@ -36,6 +36,7 @@ def process_document(document_id: str, s3_key: str):
     from config.settings import settings
 
     db = SessionLocal()
+    t0 = time.time()
     try:
         doc = db.query(Document).filter_by(id=document_id).first()
         if not doc:
@@ -44,6 +45,8 @@ def process_document(document_id: str, s3_key: str):
 
         data = s3_client.download(s3_key)
         page_blocks = extract_pages(doc.original_name, data)
+        log.info("%s: downloaded+extracted %d pages in %.1fs",
+                 document_id, len(page_blocks), time.time() - t0)
 
         pieces = []
         chunk_pages = []
@@ -55,6 +58,8 @@ def process_document(document_id: str, s3_key: str):
                 chunk_pages.append(page_number)
 
         vectors = embed_texts(pieces)
+        log.info("%s: chunked into %d pieces, embedded in %.1fs",
+                 document_id, len(pieces), time.time() - t0)
 
         job = db.query(ProcessingJob).filter_by(document_id=doc.id, job_type=JobType.embed).first()
         if not job:
@@ -82,7 +87,8 @@ def process_document(document_id: str, s3_key: str):
         doc.status = DocumentStatus.completed
         job.status = JobStatus.completed
         db.commit()
-        log.info("Document %s done: %d chunks", document_id, len(pieces))
+        log.info("Document %s done: %d chunks (total %.1fs)",
+                 document_id, len(pieces), time.time() - t0)
     except Exception as exc:
         db.rollback()
         doc = db.query(Document).filter_by(id=document_id).first()
