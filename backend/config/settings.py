@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     s3_bucket_name: str = ""
     sqs_queue_url: str = ""
 
+    github_token: str = ""
+    github_repo: str = "sri-narendra/SourceIQ"
+    github_workflow: str = "document-worker.yml"
+
     log_level: str = "INFO"
 
     model_config = {"env_file": _BACKEND_DIR / ".env", "extra": "ignore"}

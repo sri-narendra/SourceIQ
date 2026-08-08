@@ -1,5 +1,8 @@
+import json
+import logging
 import uuid
 from threading import Thread
+from urllib.request import Request, urlopen
 
 from queueing.producer import publish_document_job
 from sqlalchemy.orm import Session
@@ -8,6 +11,31 @@ from storage.s3.client import s3_client
 from config.settings import settings
 from models.entities import DocumentStatus
 from repositories.base import DocumentRepository
+
+log = logging.getLogger("document_service")
+
+
+def _dispatch_worker():
+    if not settings.github_token:
+        return  # no token configured — rely on the 5-min cron
+    body = json.dumps({"ref": "master"}).encode()
+    req = Request(
+        f"https://api.github.com/repos/{settings.github_repo}/actions/workflows/"
+        f"{settings.github_workflow}/dispatches",
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {settings.github_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urlopen(req, timeout=10):
+            pass
+        log.info("Kicked worker dispatch (workflow_dispatch)")
+    except Exception as exc:  # never block an upload over GitHub
+        log.warning("Worker dispatch failed; cron will catch it: %s", exc)
 
 
 def _process_background(document_id, s3_key):
@@ -51,6 +79,7 @@ class DocumentService:
         )
 
         publish_document_job(doc.id, job_type="extract", s3_key=s3_key)
+        Thread(target=_dispatch_worker, daemon=True).start()
         self.repo.get(doc.id).status = DocumentStatus.processing
         self.repo.db.commit()
 
