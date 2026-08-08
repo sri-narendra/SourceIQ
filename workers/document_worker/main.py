@@ -103,14 +103,25 @@ def process_message(message):
     process_document(body["document_id"], body.get("s3_key"))
 
 
+def _process_and_delete(message):
+    process_message(message)
+    from queueing.producer import delete_message
+
+    delete_message(message["ReceiptHandle"])
+
+
 def run(once: bool = False):
-    from queueing.producer import delete_message, receive_document_jobs
+    from concurrent.futures import ThreadPoolExecutor
+
+    from queueing.producer import receive_document_jobs
 
     while True:
         messages = receive_document_jobs()
-        for m in messages:
-            process_message(m)
-            delete_message(m["ReceiptHandle"])
+        if messages:
+            # ponytail: batch the run's messages into a thread pool; SQS draining is
+            # latency-bound (embedding calls), so parallelize up to 4 at a time.
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(pool.map(_process_and_delete, messages))
         if once:
             break
         time.sleep(1)
