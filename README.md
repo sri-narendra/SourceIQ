@@ -261,25 +261,47 @@ All are **permanently** free (standard per month), not 12-month limited, and **n
 
 **Step 2 — AWS account & services (all free tier):**
 
-1. Sign up at https://aws.amazon.com/free (new account → free tier enabled automatically).
-2. **S3 bucket** (e.g. `sourceiq-storage`): Create bucket → disable public access → name it. No extra config (HTTPS private by default).
-3. **SQS queue** (e.g. `sourceiq-jobs`): Create queue → standard queue → default settings (retention 4 days, 30s visibility).
-4. **(Optional but recommended) CloudFront distribution** pointing at the bucket: Cache origin requests; the app generates presigned URLs so private files stay private even at the edge.
-5. **CloudWatch**: nothing to create — with the IAM creds from step 6 set, `backend/main.py` auto-installs `monitoring/logs/cloudwatch.py`, which pushes app logs to the `sourceiq` log group in CloudWatch. It's a no-op without creds.
-6. **IAM credentials for the backend**: create a user `sourceiq-backend`, attach a policy scoped to exactly these actions:
+1. Sign up at https://aws.amazon.com/free (new account → free tier enabled automatically). Open **CloudShell** in the console (top bar) — you'll run everything below from it, no AWS CLI/profiles needed.
 
+2. **S3 bucket** + **SQS queue** — for this repo they were created in the console (S3 → Create bucket `sourceiq-storage`; SQS → Create queue `sourceiq-jobs`, Standard). The equivalent CLI is:
+
+```bash
+aws s3 mb s3://sourceiq-storage --region us-east-1                     # create bucket
+aws sqs create-queue --queue-name sourceiq-jobs --region us-east-1     # prints the queue URL
+# → https://sqs.us-east-1.amazonaws.com/355947669866/sourceiq-jobs
 ```
+
+3. **(Optional but recommended) CloudFront distribution** pointing at the bucket: Cache origin requests; the app generates presigned URLs so private files stay private even at the edge.
+
+4. **CloudWatch**: nothing to create — with the IAM creds from step 5 set, `backend/main.py` auto-installs `monitoring/logs/cloudwatch.py`, which pushes app logs to the `sourceiq` log group in CloudWatch. It's a no-op without creds.
+
+5. **IAM credentials — user, attached policy, access key** (the exact sequence used for this repo):
+
+   Save the allow policy (least-privilege — exactly S3 bucket + SQS queue + CloudWatch logs) with your real account ID, then create user + key:
+
+   ```bash
+cat > sourceiq-policy.json <<'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [
-    { "Effect": "Allow", "Action": ["s3:GetObject","s3:PutObject","s3:DeleteObject"], "Resource": "arn:aws:s3:::myiq-storage/*" },
-    { "Effect": "Allow", "Action": ["sqs:SendMessage","sqs:ReceiveMessage","sqs:DeleteMessage","sqs:GetQueueAttributes"], "Resource": "arn:aws:sqs:us-east-1:YOUR_ACCOUNT_ID:sourceiq-jobs" },
+    { "Effect": "Allow", "Action": ["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:ListBucket"], "Resource": ["arn:aws:s3:::sourceiq-storage","arn:aws:s3:::sourceiq-storage/*"] },
+    { "Effect": "Allow", "Action": ["sqs:SendMessage","sqs:ReceiveMessage","sqs:DeleteMessage","sqs:GetQueueAttributes"], "Resource": "arn:aws:sqs:us-east-1:355947669866:sourceiq-jobs" },
     { "Effect": "Allow", "Action": ["logs:PutLogEvents","logs:CreateLogStream","logs:CreateLogGroup"], "Resource": "*" }
   ]
 }
+EOF
+
+aws iam create-user --user-name sourceiq-backend
+aws iam create-policy --policy-name sourceiq-backend --policy-document 'file://sourceiq-policy.json'
+# → PolicyArn: arn:aws:iam::355947669866:policy/sourceiq-backend   (copy this)
+aws iam attach-user-policy --user-name sourceiq-backend \
+    --policy-arn arn:aws:iam::355947669866:policy/sourceiq-backend
+aws iam create-access-key --user-name sourceiq-backend
+# → prints AccessKeyId + SecretAccessKey — copy BOTH now (secret shows once)
+aws iam list-attached-user-policies --user-name sourceiq-backend    # confirm: [ "sourceiq-backend" ]
 ```
 
-   (Replace `myiq-storage`, the account ID, and region.) Download the **access key + secret** — you'll set them on Render.
+   The `create-access-key` output is the **key instantiation moment** — exactly those two values go into `backend/.env` / Render / EC2. You'll never see the Secret again.
 
 **Step 3 — Backend (Render, free tier; or EC2 t3.micro free tier):**
 
@@ -305,10 +327,10 @@ GEMINI_API_KEY=…            # or the provider you chose
 
 # AWS-free-tier variables — the interesting part:
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=<from step 2.6>
-AWS_SECRET_ACCESS_KEY=<from step 2.6>
-S3_BUCKET_NAME=myiq-storage
-SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/<ACCOUNT>/sourceiq-jobs
+AWS_ACCESS_KEY_ID=<from step 2.5 — e.g. AKIA…>
+AWS_SECRET_ACCESS_KEY=<from step 2.5>
+S3_BUCKET_NAME=sourceiq-storage
+SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/355947669866/sourceiq-jobs
 ```
 
 Once these are set, uploads go to **S3** (not `storage_local/`) and document jobs are **enqueued** to SQS instead of running in an inline thread. **The web service no longer processes uploads itself — you must run a worker that consumes the queue:**
@@ -316,7 +338,7 @@ Once these are set, uploads go to **S3** (not `storage_local/`) and document job
 ```bash
 docker run -d --pull always --restart unless-stopped \
   -e DATABASE_URL=… -e AWS_ACCESS_KEY_ID=… -e AWS_SECRET_ACCESS_KEY=… \
-  -e S3_BUCKET_NAME=myiq-storage -e SQS_QUEUE_URL=… \
+  -e S3_BUCKET_NAME=sourceiq-storage -e SQS_QUEUE_URL=… \
   sourceiq-backend python -m workers.document_worker.main
 ```
 
@@ -331,7 +353,7 @@ docker run -d --pull always --restart unless-stopped \
 docker run -d --pull always --restart unless-stopped \
   -e DATABASE_URL=… -e JWT_SECRET=… -e SECRET_KEY=… -e FRONTEND_URL=… \
   -e AWS_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=… -e AWS_SECRET_ACCESS_KEY=… \
-  -e S3_BUCKET_NAME=myiq-storage -e SQS_QUEUE_URL=… \
+  -e S3_BUCKET_NAME=sourceiq-storage -e SQS_QUEUE_URL=… \
   -p 80:8000 sourceiq-backend
 ```
 
@@ -357,7 +379,7 @@ curl -s https://my-backend.onrender.com/api/v1/health
 # storage/queue report "connected" only when the AWS vars are all set — that's your signal the S3/SQS paths are live.
 ```
 
-Then create a workspace, upload a document, and chat. Confirm a doc appears in your S3 bucket list (`s3://myiq-storage/docs/…`) to prove the live S3 path.
+Then create a workspace, upload a document, and chat. Confirm a doc appears in your S3 bucket list (`s3://sourceiq-storage/docs/…`) to prove the live S3 path. On AWS itself, you can also see the logs landing in CloudWatch → **Log groups → `sourceiq` → `sourceiq-backend`**.
 
 **Step 6 — (optional) make it 100% AWS:**
 
@@ -367,13 +389,15 @@ Then create a workspace, upload a document, and chat. Confirm a doc appears in y
 
 **Cost fallback reminder:** if you exceed any free tier limit (S3 throughput, SQS messages), only *that* overage is billed; the services stay alive. Set an AWS Budget ($1) + alert so you're never surprised.
 
-**Want it to auto-stop at the limit?** AWS Budgets can run a **budget action** that turns AWS off for you:
+**Want it to auto-stop at the limit?** AWS Budgets can run a **budget action** that turns the app's AWS access off for you. This repo is already set up this way (`sourceiq-stop` budget + action, account `355947669866`):
 
 1. **Billing → Budgets → Create budget** → amount **$1** (recurring cost).
-2. Set a **budget action**: threshold exceeded → **IAM policy action** → **deactivate** the `sourceiq-backend` IAM policy from step 2.6.
-3. When your spend hits $1, AWS **automatically detaches/deactivates that policy**, so the app's S3/SQS/CloudWatch calls fail instantly — nothing else on your account is touched.
+2. Set a **budget action**: threshold **≥ $1** → **IAM policy action** → **apply the `sourceiq-stop` policy** (a `Deny` on `s3:*`/`sqs:*`/`logs:*`) to the `sourceiq-backend` user. `AUTOMATIC` approval, email subscriber.
+3. When actual spend hits $1, AWS attaches the deny policy — an explicit `Deny` **overrides** the step-2.6 allow policy, so the app's S3/SQS/CloudWatch calls fail instantly. Nothing else on your account is touched.
 
-The free tier already keeps everything at $0, so this is a *safety net* in case the limits are exceeded or a key leaks: spend over $1 = the app's AWS access dies, and you're told. (Note: S3/SQS are billed per request, so a burst can slightly overshoot $1 before the action fires — the net catches you quickly, not with zero latency.)
+> How to set it up by hand / how this repo's exact setup was created: `aws budgets create-budget --account-id 355947669866 --budget file://budget.json` then `aws budgets create-budget-action --account-id 355947669866 --budget-name sourceiq-stop --action-type APPLY_IAM_POLICY --notification-type ACTUAL --action-threshold ActionThresholdType=ABSOLUTE_VALUE,ActionThresholdValue=1 --definition '{"IamActionDefinition":{"PolicyArn":"arn:aws:iam::355947669866:policy/sourceiq-stop","Users":["sourceiq-backend"]}}' --approval-model AUTOMATIC --subscribers '[{"SubscriptionType":"EMAIL","Address":"you@example.com"}]'` (a `sourceiq-budget-action` IAM role with `iam:AttachUserPolicy` on that user must exist and be trusted by `budgets.amazonaws.com`).
+
+The free tier already keeps everything at $0, so this is a *safety net* in case the limits are exceeded or a key leaks: spend over $1 = the app's AWS access dies, and you're emailed. (Note: S3/SQS are billed per request, so a burst can slightly overshoot $1 before the action fires — the net catches you quickly, not with zero latency.)
 
 ### What you must configure in every profile
 
