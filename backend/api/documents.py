@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from storage.s3.client import s3_client
 
 from database.session import get_db
 from middleware.auth import get_current_user
 from models.entities import DocumentChunk, User, Workspace
 from repositories.base import WorkspaceRepository
 from services.document_service import DocumentService
-from storage.s3.client import s3_client
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 

@@ -1,4 +1,4 @@
-from ai.chunking.text_extractor import extract_text, extract_pages
+from ai.chunking.text_extractor import extract_pages, extract_text
 
 
 def test_text_extraction_single_page():
@@ -8,10 +8,10 @@ def test_text_extraction_single_page():
 
 
 def test_pdf_extracts_per_page():
-    from pypdf import PdfReader
     import io
 
     import pymupdf
+    from pypdf import PdfReader
 
     buf = io.BytesIO()
     doc = pymupdf.open()
@@ -31,7 +31,6 @@ def test_pdf_extracts_per_page():
 
 def test_unsupported_type_raises():
     import pytest
-
     from ai.chunking.text_extractor import UnknownTypeError
 
     with pytest.raises(UnknownTypeError):

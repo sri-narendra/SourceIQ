@@ -11,6 +11,11 @@ from database.session import Base, engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ponytail: only where AWS creds exist; this is cheap, silent elsewhere.
+    from monitoring.logs.cloudwatch import install as install_cloudwatch
+
+    install_cloudwatch()
+
     # ponytail: create schema on boot so a fresh local DB works with a minimal .env;
     # swap for a real migration tool (alembic) when schema changes need versioning.
     try:

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 import { authApi } from "@/services/api-endpoints";
@@ -30,73 +31,87 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-zinc-50 p-6 dark:bg-black">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950"
-      >
-        <p className="mb-1 font-mono text-sm text-zinc-500 dark:text-zinc-400">
-          Source<span className="text-emerald-500">IQ</span>
-        </p>
-        <h1 className="mb-6 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          {mode === "login" ? "Sign in" : "Create account"}
-        </h1>
+    <main className="paper flex min-h-dvh items-center justify-center p-6 text-foreground">
+      <div className="w-full max-w-md">
+        <Link href="/" className="inline-block border-[3px] border-line bg-signal px-3 py-1 font-mono text-lg font-black tracking-tight text-background shadow-[5px_5px_0_0_var(--line)]">
+          Source<span className="text-ember">IQ</span><span className="ml-2 text-xs font-bold">auth</span>
+        </Link>
 
-        {mode === "register" && (
-          <label className="mb-3 block">
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">Name</span>
-            <input
-              data-testid="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-            />
-          </label>
-        )}
+        <div className="mt-8 border-[3px] border-line bg-panel p-8 shadow-[9px_9px_0_0_var(--line)]">
+          <div className="mb-6 flex items-center justify-between gap-3 border-b-[3px] border-dashed border-line pb-4">
+            <h1 className="font-mono text-2xl font-black tracking-tight">
+              {mode === "login" ? "Who&apos;s there?" : "New identity"}
+            </h1>
+            <span className="border-2 border-line bg-ember px-2 py-1 font-mono text-[10px] font-black uppercase text-background">
+              {mode === "login" ? "sign in" : "register"}
+            </span>
+          </div>
 
-        <label className="mb-3 block">
-          <span className="text-sm text-zinc-600 dark:text-zinc-400">Email</span>
-          <input
-            data-testid="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
+          <form onSubmit={submit} className="space-y-6">
+            {mode === "register" && (
+              <label className="block">
+                <span className="caption mb-2 block">designation</span>
+                <input
+                  data-testid="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  placeholder="Big Boss"
+                  className="focus-ring w-full border-[3px] border-line bg-background px-3 py-3 font-mono text-sm font-bold placeholder:text-dim focus:border-signal"
+                />
+              </label>
+            )}
 
-        <label className="mb-5 block">
-          <span className="text-sm text-zinc-600 dark:text-zinc-400">Password</span>
-          <input
-            data-testid="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
+            <label className="block">
+              <span className="caption mb-2 block">email</span>
+              <input
+                data-testid="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@station.local"
+                className="focus-ring w-full border-[3px] border-line bg-background px-3 py-3 font-mono text-sm font-bold placeholder:text-dim focus:border-signal"
+              />
+            </label>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+            <label className="block">
+              <span className="caption mb-2 block">password</span>
+              <input
+                data-testid="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                className="focus-ring w-full border-[3px] border-line bg-background px-3 py-3 font-mono text-sm font-bold placeholder:text-dim focus:border-signal"
+              />
+            </label>
 
-        <button
-          data-testid="submit"
-          type="submit"
-          className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-white dark:bg-zinc-50 dark:text-black"
-        >
-          {mode === "login" ? "Sign in" : "Create account"}
-        </button>
+            {error && (
+              <p className="border-[3px] border-line bg-ember px-3 py-2 font-mono text-xs font-bold text-background shadow-[4px_4px_0_0_var(--line)]">
+                ! {error}
+              </p>
+            )}
 
-        <button
-          type="button"
-          onClick={() => setMode(mode === "login" ? "register" : "login")}
-          className="mt-3 w-full text-center text-sm text-zinc-500 underline"
-        >
-          {mode === "login" ? "Need an account? Register" : "Have an account? Sign in"}
-        </button>
-      </form>
+            <button
+              data-testid="submit"
+              type="submit"
+              className="focus-ring block w-full border-[3px] border-line bg-foreground px-4 py-3.5 font-mono text-sm font-black uppercase text-background shadow-[6px_6px_0_0_var(--line)] transition-transform hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[3px_3px_0_0_var(--line)]"
+            >
+              {mode === "login" ? "LET ME IN" : "CREATE ACCOUNT"}
+            </button>
+
+            <p className="text-center font-mono text-xs font-bold text-dim">
+              {mode === "login" ? (
+                <>Don&apos;t have one? <button type="button" onClick={() => setMode("register")} className="text-ember underline decoration-2 underline-offset-4 hover:text-ghost">register here</button></>
+              ) : (
+                <>Already keyed in? <button type="button" onClick={() => setMode("login")} className="text-ember underline decoration-2 underline-offset-4 hover:text-ghost">back to sign in</button></>
+              )}
+            </p>
+          </form>
+        </div>
+      </div>
     </main>
   );
 }

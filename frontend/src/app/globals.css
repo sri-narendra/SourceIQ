@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-signal: var(--signal);
+  --color-ember: var(--ember);
+  --color-voltage: var(--voltage);
+  --color-slag: var(--slag);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-dim: var(--dim);
+  --color-ghost: var(--ghost);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: oklch(0.97 0.02 85);
+  --foreground: oklch(0.22 0.03 85);
+  --signal: oklch(0.58 0.22 262);
+  --ember: oklch(0.66 0.21 25);
+  --voltage: oklch(0.7 0.17 235);
+  --slag: oklch(0.925 0.025 85);
+  --panel: oklch(0.955 0.02 85);
+  --line: oklch(0.22 0.03 85);
+  --dim: oklch(0.44 0.04 85);
+  --ghost: oklch(0.3 0.03 85);
+}
+
+html {
+  color-scheme: light;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* ---- paper: warm cream field with a light halftone dot grid ---- */
+.paper {
+  background-color: var(--background);
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--line) 16%, transparent) 1.2px,
+    transparent 1.7px
+  );
+  background-size: 22px 22px;
+}
+
+/* ---- brutal base: thick ink border on whatever surface sits behind ---- */
+.brutal {
+  border: 2px solid var(--line);
+  box-shadow: 5px 5px 0 0 var(--line);
+}
+
+.brutal-sm {
+  border: 2px solid var(--line);
+  box-shadow: 3px 3px 0 0 var(--line);
+}
+
+/* pressed-state: the hard shadow squashes under the finger */
+.brutal-press:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 3px 3px 0 0 var(--line);
+}
+.brutal-press:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 0 var(--line);
+}
+
+/* ---- tiny display nice: mono, tracked, all-caps ---- */
+.caption {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+/* ---- marquee ticker: repeat the strip content twice for a seamless loop ---- */
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticker:hover .tape {
+  animation-play-state: paused;
+}
+.tape {
+  display: inline-flex;
+  width: max-content;
+  animation: ticker-move 28s linear infinite;
+}
+@keyframes ticker-move {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- wobbly sticker ---- */
+.sticker {
+  border: 2px solid var(--line);
+  background: var(--panel);
+  box-shadow: 2px 2px 0 0 var(--line);
+  color: var(--ghost);
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 2px;
 }

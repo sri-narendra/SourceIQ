@@ -3,10 +3,12 @@ import { expect, test } from "@playwright/test";
 const email = `e2e_${Date.now()}@testmail.dev`;
 const password = "Testpass1!";
 
-test("core flow: register, login, create workspace, chat", async ({ page }) => {
+test("core flow: landing, register, login, create workspace, chat", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText("Load every file")).toBeVisible();
+
+  await page.goto("/login");
 
   await page.getByTestId("submit").waitFor();
 
@@ -14,10 +16,10 @@ test("core flow: register, login, create workspace, chat", async ({ page }) => {
   await page.getByTestId("password").fill(password);
   await page.getByTestId("submit").click();
 
-  await page.goto("/");
+  await page.goto("/login");
   await expect(page).toHaveURL(/\/login/);
 
-  await page.getByText("Need an account? Register").click();
+  await page.getByText("register", { exact: false }).click();
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByTestId("name").fill("E2E Tester");

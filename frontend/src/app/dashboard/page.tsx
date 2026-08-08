@@ -58,22 +58,18 @@ export default function DashboardPage() {
   }, [preview]);
 
   useEffect(() => {
-    loadWorkspaces();
+    workspaceApi
+      .list()
+      .then((list) => {
+        setWorkspaces(list);
+        if (list.length > 0) setCurrent(list[0]);
+      })
+      .catch(() => setError("Failed to load workspaces"));
   }, []);
-
-  async function loadWorkspaces() {
-    try {
-      const list = await workspaceApi.list();
-      setWorkspaces(list);
-      if (list.length > 0) setCurrent(list[0]);
-    } catch {
-      setError("Failed to load workspaces");
-    }
-  }
 
   useEffect(() => {
     if (!current) {
-      setDocs([]);
+      setDocs([]); // eslint-disable-line react-hooks/set-state-in-effect -- reset stale docs on workspace change
       return;
     }
     documentApi
@@ -244,42 +240,46 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="flex h-dvh overflow-hidden bg-zinc-50 dark:bg-black">
-      <aside className="w-72 border-r border-zinc-200 p-4 dark:border-zinc-800">
+    <main className="paper flex h-dvh overflow-hidden text-foreground">
+      <aside className="flex w-80 flex-col overflow-y-auto border-r-[3px] border-line bg-slag p-4">
         <Link
           href="/"
-          className="mb-4 block font-mono text-lg font-semibold text-zinc-900 hover:text-emerald-600 dark:text-zinc-50 dark:hover:text-emerald-400"
+          className="mb-4 inline-block self-start border-[3px] border-line bg-signal px-3 py-1 font-mono text-xl font-black tracking-tight text-background shadow-[5px_5px_0_0_var(--line)]"
           data-testid="home-link"
         >
-          Source<span className="text-emerald-500">IQ</span>
+          Source<span className="text-ember">IQ</span>
         </Link>
-        <h2 className="mb-4 text-lg font-semibold">Workspaces</h2>
-        <form onSubmit={createWorkspace} className="mb-4 flex flex-col gap-2">
-          <input
-            data-testid="workspace-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="New workspace name"
-            className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-          <button
-            data-testid="create-workspace"
-            type="submit"
-            className="rounded-lg bg-zinc-900 px-3 py-2 text-white dark:bg-zinc-50 dark:text-black"
-          >
-            Create
-          </button>
-        </form>
-        <ul className="flex flex-col gap-1">
+
+        <div className="border-[3px] border-line bg-panel p-3 shadow-[5px_5px_0_0_var(--line)]">
+          <p className="caption mb-2">workspace index</p>
+          <form onSubmit={createWorkspace} className="flex flex-col gap-2">
+            <input
+              data-testid="workspace-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="new/workspace"
+              className="focus-ring w-full border-[3px] border-line bg-background px-2.5 py-2 font-mono text-xs font-bold placeholder:text-dim focus:border-signal"
+            />
+            <button
+              data-testid="create-workspace"
+              type="submit"
+              className="focus-ring border-[3px] border-line bg-foreground px-2.5 py-2 font-mono text-xs font-black text-background shadow-[4px_4px_0_0_var(--line)] transition-transform hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_0_var(--line)]"
+            >
+              + SPIN UP
+            </button>
+          </form>
+        </div>
+
+        <ul className="mt-3 flex flex-col gap-2">
           {workspaces.map((w) => (
-            <li key={w.id} className="flex items-center gap-1">
+            <li key={w.id} className="flex items-stretch gap-2">
               <button
                 data-testid={`workspace-${w.name}`}
                 onClick={() => setCurrent(w)}
-                className={`flex-1 rounded-lg px-3 py-2 text-left text-sm ${
+                className={`focus-ring flex-1 border-[3px] border-line px-3 py-2 text-left font-mono text-sm font-bold transition-transform ${
                   current?.id === w.id
-                    ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-black"
-                    : "hover:bg-zinc-200 dark:hover:bg-zinc-900"
+                    ? "bg-ember text-background shadow-[4px_4px_0_0_var(--line)]"
+                    : "bg-panel text-ghost hover:shadow-[4px_4px_0_0_var(--line)]"
                 }`}
               >
                 {w.name}
@@ -287,7 +287,7 @@ export default function DashboardPage() {
               <button
                 data-testid={`delete-workspace-${w.name}`}
                 onClick={() => deleteWorkspace(w.id)}
-                className="shrink-0 rounded-lg px-2 py-2 text-zinc-400 hover:text-red-600"
+                className="focus-ring shrink-0 border-[3px] border-line bg-panel px-2 font-bold text-ghost shadow-[3px_3px_0_0_var(--line)] hover:bg-ember hover:text-background"
                 aria-label={`Delete workspace ${w.name}`}
               >
                 ✕
@@ -295,26 +295,24 @@ export default function DashboardPage() {
             </li>
           ))}
         </ul>
+
         {current && (
           <div className="mt-6">
-            <h3 className="mb-2 text-sm font-semibold text-zinc-500">Documents</h3>
+            <h3 className="caption mb-2">attached documents</h3>
             {docs.length === 0 ? (
-              <p className="text-xs text-zinc-400">No documents yet</p>
+              <p className="font-mono text-xs font-bold text-dim">[ none attached ]</p>
             ) : (
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-2">
                 {docs.map((d) => (
-                  <li
-                    key={d.id}
-                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs dark:border-zinc-800"
-                  >
+                  <li key={d.id} className="border-[3px] border-line bg-panel px-3 py-2 shadow-[3px_3px_0_0_var(--line)]">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-medium" title={d.name}>
+                      <span className="truncate font-mono text-xs font-bold text-ghost" title={d.name}>
                         {d.name}
                       </span>
                       <button
                         data-testid={`delete-doc-${d.name}`}
                         onClick={() => deleteDoc(d.id)}
-                        className="shrink-0 text-zinc-400 hover:text-red-600"
+                        className="shrink-0 px-1 font-mono text-xs font-bold text-dim hover:text-ember"
                         aria-label={`Delete ${d.name}`}
                       >
                         ✕
@@ -323,11 +321,12 @@ export default function DashboardPage() {
                     <span
                       data-testid={`doc-status-${d.name}`}
                       className={[
+                        "mt-1 inline-block border-2 border-line px-1.5 py-0.5 font-mono text-[10px] font-black uppercase tracking-widest",
                         d.status === "completed"
-                          ? "text-green-600 dark:text-green-400"
+                          ? "bg-voltage text-background"
                           : d.status === "failed"
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-amber-600 dark:text-amber-400",
+                          ? "bg-ember text-background"
+                          : "bg-paper text-ghost",
                       ].join(" ")}
                     >
                       {d.status}
@@ -342,52 +341,70 @@ export default function DashboardPage() {
 
       <section className="flex min-h-0 flex-1 flex-col">
         {!current ? (
-          <div className="flex flex-1 items-center justify-center text-zinc-500">
-            Create a workspace to get started
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+            <span className="border-[3px] border-line bg-signal px-6 py-3 font-mono text-5xl font-black text-background shadow-[8px_8px_0_0_var(--line)]">
+              []
+            </span>
+            <p className="caption mt-3">no channel bound</p>
+            <p className="max-w-sm text-center text-sm font-bold text-dim">
+              Create a workspace in the left index, then attach documents and open a query
+              session.
+            </p>
           </div>
         ) : (
           <>
-            <header className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-800">
-              <h1 data-testid="current-workspace" className="text-xl font-semibold">
-                {current.name}
-              </h1>
-              <button
-                data-testid="delete-chat"
-                onClick={deleteChat}
-                className="cursor-pointer text-sm text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
-              >
-                Delete chat
-              </button>
-              <label className="cursor-pointer text-sm text-zinc-500 underline">
-                {uploading ? "Uploading…" : "Upload document"}
-                <input
-                  data-testid="upload-doc"
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.pptx,.xlsx,.odt,.txt,.md,.csv,.tsv,.json,.xml,.html,.yaml,.yml,.rtf,.py,.js,.ts,.java,.cpp,.go,.rs,.rb,.php,.swift,.kt,.sh,.log,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp"
-                  className="hidden"
-                  onChange={uploadDoc}
-                />
-              </label>
-              <button
-                data-testid="logout"
-                onClick={logout}
-                className="rounded-lg border border-zinc-300 px-3 py-1 text-sm text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Log out
-              </button>
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b-[3px] border-line bg-panel px-4 py-3">
+              <div className="flex items-center gap-3">
+                <h1
+                  data-testid="current-workspace"
+                  className="font-mono text-xl font-black tracking-tight"
+                >
+                  {current.name}
+                </h1>
+                <span className="inline-block border-2 border-line bg-voltage px-2 py-0.5 font-mono text-[10px] font-black uppercase text-background">
+                  session live
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 font-mono text-xs font-bold">
+                <button
+                  data-testid="delete-chat"
+                  onClick={deleteChat}
+                  className="focus-ring border-[3px] border-line bg-background px-2.5 py-1.5 text-ghost shadow-[3px_3px_0_0_var(--line)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[1px_1px_0_0_var(--line)]"
+                >
+                  clear chat
+                </button>
+                <label className="focus-ring inline-block cursor-pointer border-[3px] border-line bg-voltage px-2.5 py-1.5 text-background shadow-[3px_3px_0_0_var(--line)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[1px_1px_0_0_var(--line)]">
+                  {uploading ? "← INGESTING…" : "+ ATTACH FILE"}
+                  <input
+                    data-testid="upload-doc"
+                    type="file"
+                    multiple
+                    accept=".pdf,.docx,.pptx,.xlsx,.odt,.txt,.md,.csv,.tsv,.json,.xml,.html,.yaml,.yml,.rtf,.py,.js,.ts,.java,.cpp,.go,.rs,.rb,.php,.swift,.kt,.sh,.log,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp"
+                    className="hidden"
+                    onChange={uploadDoc}
+                  />
+                </label>
+                <button
+                  data-testid="logout"
+                  onClick={logout}
+                  className="focus-ring border-[3px] border-line bg-ember px-2.5 py-1.5 text-background shadow-[3px_3px_0_0_var(--line)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[1px_1px_0_0_var(--line)]"
+                >
+                  logout
+                </button>
+              </div>
             </header>
 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
               {messages.map((m, i) => (
                 <div
                   key={i}
-                  className={`flex max-w-[80%] flex-col gap-2 rounded-lg px-4 py-2 text-sm ${
+                  className={`flex max-w-[82%] flex-col gap-2 border-[3px] border-line p-3 font-mono text-sm ${
                     m.role === "user"
-                      ? "self-end bg-zinc-900 text-white dark:bg-zinc-50 dark:text-black"
-                      : "self-start bg-white dark:bg-zinc-900"
+                      ? "self-end bg-ember text-background shadow-[5px_5px_0_0_var(--line)]"
+                      : "self-start bg-panel text-ghost shadow-[5px_5px_0_0_var(--line)]"
                   }`}
                 >
+                  <span className="caption">{m.role === "user" ? "you ▸" : "grid ▸"}</span>
                   <span className="whitespace-pre-wrap">{m.content}</span>
                   {m.role === "assistant" && m.sources && m.sources.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
@@ -396,7 +413,7 @@ export default function DashboardPage() {
                           key={j}
                           data-testid={`source-chip-${s.document}`}
                           onClick={() => showPreview(s)}
-                          className={`rounded-full px-2 py-0.5 text-[11px] bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 hover:text-zinc-800 dark:hover:bg-zinc-700 dark:hover:text-zinc-100 cursor-pointer`}
+                          className="focus-ring cursor-pointer border-[3px] border-line bg-foreground px-2 py-0.5 text-[11px] font-black text-ember shadow-[3px_3px_0_0_var(--line)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[1px_1px_0_0_var(--line)]"
                         >
                           {s.document}
                           {s.page != null && ` · p${s.page}`}
@@ -407,70 +424,84 @@ export default function DashboardPage() {
                   )}
                 </div>
               ))}
-              {busy && <div className="text-sm text-zinc-500">Thinking…</div>}
+              {busy && (
+                <div className="self-start border-[3px] border-line bg-signal p-3 font-mono text-sm font-bold text-background shadow-[5px_5px_0_0_var(--line)]">
+                  <span className="animate-pulse">▮▮▮</span> querying index…
+                </div>
+              )}
             </div>
 
-            <form onSubmit={ask} className="flex gap-2 border-t border-zinc-200 p-4 dark:border-zinc-800">
+            <form
+              onSubmit={ask}
+              className="flex gap-2 border-t-[3px] border-line bg-panel p-3"
+            >
               <input
                 data-testid="chat-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a question about your documents"
-                className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                placeholder="ask the pile…"
+                className="focus-ring min-w-0 flex-1 border-[3px] border-line bg-background px-3 py-2.5 font-mono text-sm font-bold placeholder:text-dim focus:border-signal"
               />
               <button
                 data-testid="send"
                 type="submit"
-                className="rounded-lg bg-zinc-900 px-4 py-2 text-white dark:bg-zinc-50 dark:text-black"
+                className="focus-ring border-[3px] border-line bg-ember px-6 font-mono text-sm font-black text-background shadow-[5px_5px_0_0_var(--line)] transition-transform hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_0_var(--line)]"
               >
-                Send
+                RUN
               </button>
             </form>
           </>
         )}
       </section>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {error && (
+        <div className="fixed right-4 bottom-4 z-50 max-w-sm border-[3px] border-line bg-ember p-3 font-mono text-xs font-bold text-background shadow-[5px_5px_0_0_var(--line)]">
+          ! {error}
+        </div>
+      )}
+
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-white dark:bg-zinc-900 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-              <h3 data-testid="preview-title" className="text-sm font-semibold">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-foreground/70 p-4">
+          <div className="flex max-h-[85vh] w-full max-w-3xl flex-col border-[3px] border-line bg-panel shadow-[10px_10px_0_0_var(--line)]">
+            <div className="flex items-center justify-between gap-3 border-b-[3px] border-line px-4 py-3">
+              <h3 data-testid="preview-title" className="flex items-center gap-3 font-mono text-sm font-black">
+                <span className="inline-block border-2 border-line bg-signal px-1.5 text-background">▶</span>
                 {preview.name}
                 {preview.page != null && (
-                  <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-normal text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                    Page {preview.page}
+                  <span className="border-[3px] border-line bg-ember px-2 py-0.5 font-mono text-[11px] font-black text-background">
+                    page {preview.page}
                   </span>
                 )}
               </h3>
               <button
                 data-testid="preview-close"
                 onClick={() => setPreview(null)}
-                className="rounded-md px-2 py-0.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="focus-ring border-[3px] border-line bg-background px-2 py-0.5 font-mono text-xs font-bold text-ghost shadow-[3px_3px_0_0_var(--line)] hover:bg-ember hover:text-background"
               >
-                Esc / ✕
+                ✕ close
               </button>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
               {previewBusy ? (
-                "Loading preview…"
+                <div className="font-mono text-sm font-bold text-ghost">loading byte stream…</div>
               ) : preview.fileUrl && preview.name.match(/\.(png|jpe?g|gif|bmp|tiff?|webp)$/i) ? (
                 <img
                   data-testid="preview-image"
                   src={preview.fileUrl}
                   alt={preview.name}
-                  className="max-h-[60vh] w-auto self-center rounded-lg border border-zinc-200 dark:border-zinc-800"
+                  className="max-h-[55vh] w-auto self-center border-[3px] border-line bg-slag shadow-[5px_5px_0_0_var(--line)]"
                 />
               ) : preview.fileUrl && preview.name.match(/\.pdf$/i) ? (
                 <iframe
                   data-testid="preview-pdf"
                   src={`${preview.fileUrl}${preview.page ? `#page=${preview.page}` : ""}`}
-                  className="h-[60vh] w-full rounded-lg border border-zinc-200 dark:border-zinc-800"
+                  className="h-[58vh] w-full border-[3px] border-line bg-background shadow-[5px_5px_0_0_var(--line)]"
                   title={preview.name}
                 />
               ) : null}
               <div
                 data-testid="preview-content"
-                className="whitespace-pre-wrap rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50"
+                className="border-[3px] border-line bg-slag p-3 font-mono text-[13px] whitespace-pre-wrap text-ghost shadow-[4px_4px_0_0_var(--line)]"
               >
                 {preview.content}
               </div>
