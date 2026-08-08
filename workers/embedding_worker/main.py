@@ -6,8 +6,9 @@ Run standalone:  python -m workers.embedding_worker.main
 
 def run():
     from database.session import SessionLocal
-    from models.entities import DocumentChunk, Document, DocumentStatus, Embedding
+    from models.entities import DocumentChunk, DocumentStatus, Embedding
     from ai.embeddings.provider import embed_texts
+    from config.settings import settings
 
     db = SessionLocal()
     try:
@@ -20,8 +21,16 @@ def run():
         )
         for chunk in missing:
             [vec] = embed_texts([chunk.content])
-            db.add(Embedding(chunk_id=chunk.id, embedding=vec, model="text-embedding-004"))
-            chunk.document.status = DocumentStatus.completed if (chunk.document and chunk.document.status == DocumentStatus.failed) else chunk.document.status
+            db.add(
+                Embedding(
+                    chunk_id=chunk.id,
+                    embedding=vec,
+                    model=settings.embedding_model,
+                )
+            )
+            doc = chunk.document
+            if doc and doc.status == DocumentStatus.failed:
+                doc.status = DocumentStatus.completed
         db.commit()
         print(f"Re-embedded {len(missing)} chunks")
     finally:

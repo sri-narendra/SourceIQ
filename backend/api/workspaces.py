@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database.session import get_db
@@ -28,3 +28,18 @@ def list_workspaces(
 ):
     svc = WorkspaceService(db)
     return svc.with_doc_counts(svc.list_for_user(str(user.id)))
+
+
+@router.delete("/{workspace_id}")
+def delete_workspace(
+    workspace_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    svc = WorkspaceService(db)
+    ws = svc.get_for_user(workspace_id, str(user.id))
+    if not ws:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    if not svc.delete(workspace_id):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return {"success": True, "message": "Workspace deleted"}

@@ -24,6 +24,7 @@ export const workspaceApi = {
   create: (name: string, description?: string) =>
     api.post("/workspaces", { name, description }),
   list: async () => (await api.get<IWorkspace[]>("/workspaces")).data,
+  remove: (workspaceId: string) => api.delete(`/workspaces/${workspaceId}`),
 };
 
 export const documentApi = {
@@ -31,9 +32,7 @@ export const documentApi = {
     const form = new FormData();
     form.append("workspace_id", workspaceId);
     form.append("file", file);
-    return api.post("/documents/upload", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return api.post("/documents/upload", form);
   },
   list: async (workspaceId?: string) =>
     (
@@ -42,6 +41,16 @@ export const documentApi = {
       })
     ).data,
   remove: (documentId: string) => api.delete(`/documents/${documentId}`),
+  preview: async (documentId: string) =>
+    (await api.get<{ id: string; name: string; content: string }>(
+      `/documents/${documentId}/preview`,
+    )).data,
+  fileUrl: async (documentId: string) => {
+    const res = await api.get(`/documents/${documentId}/file`, {
+      responseType: "blob",
+    });
+    return URL.createObjectURL(res.data);
+  },
 };
 
 export const chatApi = {
@@ -49,6 +58,7 @@ export const chatApi = {
     (await api.post<IChatResponse>("/chat", body)).data,
   history: (conversationId: string) =>
     api.get("/chat/history", { params: { conversation_id: conversationId } }),
+  remove: (conversationId: string) => api.delete(`/chat/${conversationId}`),
 };
 
 export const searchApi = {

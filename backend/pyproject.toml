@@ -9,4 +9,6 @@ ignore = []
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = ["."]
+pythonpath = ["..", "."]
+addopts = "--cov=services --cov=ai --cov=api --cov=repositories --cov=config --cov=middleware --cov-report=term-missing"
+testpaths = ["tests"]

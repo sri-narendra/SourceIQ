@@ -58,6 +58,7 @@ class DocumentOut(BaseModel):
 class ChatRequest(BaseModel):
     workspace_id: UUID
     message: str
+    conversation_id: Optional[UUID] = None
 
 
 class ChatResponse(BaseModel):

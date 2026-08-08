@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
@@ -37,7 +36,11 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-004"
 
     max_file_size_mb: int = 25
-    allowed_file_types: str = "pdf,docx,txt"
+    allowed_file_types: str = (
+        "pdf,docx,pptx,xlsx,odt,txt,md,csv,tsv,json,xml,html,yaml,yml,rtf,"
+        "py,js,ts,java,cpp,go,rs,rb,php,swift,kt,sh,log,"
+        "png,jpg,jpeg,bmp,tif,tiff,webp"
+    )
 
     aws_region: str = ""
     aws_access_key_id: str = ""

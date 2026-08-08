@@ -33,6 +33,14 @@ class BaseRepository:
     def get(self, id):
         return self.db.query(self.model).filter(self.model.id == id).first()
 
+    def delete(self, id) -> bool:
+        obj = self.db.query(self.model).filter(self.model.id == id).first()
+        if not obj:
+            return False
+        self.db.delete(obj)
+        self.db.commit()
+        return True
+
     def list(self, **filters) -> List:
         query = self.db.query(self.model)
         for k, v in filters.items():
@@ -50,6 +58,13 @@ class UserRepository(BaseRepository):
 
 class WorkspaceRepository(BaseRepository):
     model = Workspace
+
+    def get_for_user(self, id, owner_id) -> Optional[Workspace]:
+        return (
+            self.db.query(self.model)
+            .filter(self.model.id == id, self.model.owner_id == owner_id)
+            .first()
+        )
 
     def count_documents(self, workspace_id) -> int:
         return (

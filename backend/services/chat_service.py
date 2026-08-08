@@ -16,9 +16,7 @@ class ChatService:
         self.msg_repo = MessageRepository(db)
         self.doc_repo = DocumentRepository(db)
 
-    def answer(self, workspace_id: str, user_id: str, message: str) -> dict:
-        conversation_id = None
-
+    def answer(self, workspace_id: str, user_id: str, message: str, conversation_id=None) -> dict:
         chunks = retrieve_chunks(self.db, workspace_id, message, top_k=4)
         answer, sources = self._generate(workspace_id, message, chunks)
 

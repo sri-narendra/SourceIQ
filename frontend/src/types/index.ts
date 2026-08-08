@@ -24,14 +24,17 @@ export interface IMessage {
 }
 
 export interface IChatSource {
+  document_id?: string | null;
   document: string;
   page?: number | null;
   score: number;
+  content?: string;
 }
 
 export interface IChatRequest {
-  workspaceId: string;
+  workspace_id: string;
   message: string;
+  conversation_id?: string;
 }
 
 export interface IChatResponse {

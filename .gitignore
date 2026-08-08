@@ -35,3 +35,6 @@ Thumbs.db
 # Uploads / tmp
 tmp/
 uploads/
+storage_local/
+backend/.coverage
+.coverage

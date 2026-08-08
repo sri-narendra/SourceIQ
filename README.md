@@ -1,8 +1,26 @@
 # AI Knowledge Management Platform
 
-Enterprise RAG SaaS — upload documents, chat with them via AI, get answers with source citations.
+Enterprise RAG SaaS — upload documents, chat with them via AI, get answers with source citations. Runs fully locally with a minimal `.env` (no AWS required) and scales to S3/SQS in production.
 
-Stack: Next.js 15 + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS/CloudWatch) + Gemini/Groq/OpenAI/Mistral/NVIDIA/OpenRouter/vLLM.
+Stack: Next.js + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS) + Gemini/Groq/OpenAI/Mistral/NVIDIA/OpenRouter/vLLM + OCR (RapidOCR).
+
+**Local-first modes:**
+- **Storage**: uses a local-disk fallback (`storage_local/`) when AWS keys are absent
+- **Queue**: runs the document pipeline in-process when `SQS_QUEUE_URL` isn't set
+- **AI**: uses any configured provider key; drops to a deterministic local fallback if none
+- **DB**: auto-provisions the schema (tables + `vector` extension) on startup — no manual SQL
+
+## Features
+
+- **RAG chat with citations** — retrieve top-k chunks and generate a grounded answer (Groq/Gemini/OpenAI/Mistral/NVIDIA/OpenRouter/vLLM/Ollama) with source scores inline
+- **Clickable source previews** — each answer cites the exact source doc, and clicking the chip opens a preview of the file: PDFs render inline (`<iframe>` auto-jumping to the cited page via `#page=N`), images render natively, and the retrieved chunk's text is shown alongside a **Page N** badge
+- **Page-aware retrieval** — PDFs are extracted per page, each chunk is tagged with its 1-based `page_number`, and every source citation reports which page the answer came from
+- **40+ upload formats** — plain text/code, Markdown, CSV, JSON, Office (docx/pptx/xlsx/odt), PDF, and OCR'd images
+- **OCR** — scanned PDFs fall back to RapidOCR; images (png/jpg/jpeg/bmp/tif/tiff/webp) are OCR'd directly
+- **Document status in UI** — sidebar shows per-doc status (`uploading → processing → completed/failed`) and polls while processing
+- **Delete anywhere** — workspaces, documents, and chats each have a one-click ✕ delete (no confirmation)
+- **Multi-file upload** — select several files at once; per-file errors surfaced in the UI
+- **Log out** — dedicated button in the chat header clears the session token and returns to the login page
 
 **Layer responsibilities:**
 - `frontend/` — user-facing UI (auth, dashboard, upload, chat)
@@ -19,7 +37,7 @@ Stack: Next.js 15 + FastAPI + PostgreSQL/pgvector + AWS (S3/SQS/CloudWatch) + Ge
 
 ```
 projectv1/
-├── frontend/                  # Next.js 15 + React + TypeScript + Tailwind (Vercel)
+├── frontend/                  # Next.js 16 + React + TypeScript + Tailwind (Vercel)
 │   ├── src/app/               # App Router pages & layouts
 │   ├── src/components/        # Reusable UI components
 │   ├── src/features/          # Feature-specific UI (upload, chat, search, dashboard)
@@ -37,6 +55,7 @@ projectv1/
 ├── backend/                   # FastAPI + SQLAlchemy (Render/Docker)
 │   ├── main.py                # App entrypoint, CORS, health check
 │   ├── api/                   # HTTP route handlers (auth, chat, documents, search, ...)
+│   │                          #   includes GET /documents/{id}/preview + /documents/{id}/file
 │   ├── controllers/           # Request/response layer (thin, route-focused)
 │   ├── services/              # Business logic (auth, chat, document, search, dashboard)
 │   ├── repositories/          # Database access (per-entity repos)
@@ -61,22 +80,19 @@ projectv1/
 │
 ├── ai/                        # RAG logic (Python, framework-agnostic)
 │   ├── embeddings/            # Embedder providers (gemini/openai/local fallback)
-│   ├── chunking/              # Text extraction + chunking
-│   ├── retrieval/             # Vector search + source formatting
+│   ├── chunking/              # Text extraction (txt/pdf/docx/pptx/xlsx/odt/image OCR) + chunking
+│   │                          #   extract_pages(): per-page text for PDFs, OCR fallback for scans
+│   ├── retrieval/             # Vector search + source formatting (doc, page, score, chunk content)
 │   ├── generation/            # LLM answer generation per provider
 │   ├── prompts/               # Prompt templates
 │   └── models/                # LLM provider registry (gemini/groq/openai/mistral/nvidia/openrouter/vllm/ollama)
 │
-├── storage/                   # AWS S3 utilities
-│   ├── s3/                    # S3 client (upload/download/delete/URLs)
-│   ├── upload/                # Upload flows
-│   └── download/              # Download flows
+├── storage/                   # Storage client (S3 with local-disk fallback)
+│   └── s3/                    # S3 client (upload/download/delete/URLs)
+│                             # local fallback: writes storage_local/ when no AWS keys
 │
-├── queueing/                  # AWS SQS producer/consumer/events
-│   │                          # (named 'queueing' to avoid shadowing stdlib 'queue')
-│   ├── producer.py            # Publish document jobs
-│   ├── consumer/              # SQS consume loop
-│   └── events/                # Job event types
+├── queueing/                  # AWS SQS producer/events
+│   └── producer.py            # Publish document jobs (no-op locally, in-process fallback)
 │
 ├── monitoring/                # AWS CloudWatch
 │   ├── logs/                  # Structured logging setup
@@ -138,20 +154,31 @@ Files: `config/settings.py`, `main.py`, `schemas/contracts.py`, `middleware/auth
 ### 4. AI / RAG pipeline
 
 - `ai/embeddings/providers.py` — Gemini/OpenAI + deterministic local fallback.
-- `ai/chunking/chunker.py` & `text_extractor.py` — PDF/DOCX/TXT → chunks.
+- `ai/chunking/chunker.py` & `text_extractor.py` — 40+ formats → chunks.
 - `ai/retrieval/retriever.py` — cosine search (swap for pgvector HNSW later).
 - `ai/generation/generator.py` — per-provider generation (Gemini, Groq, OpenAI-compatible: OpenAI/Mistral/NVIDIA/OpenRouter, plus local vLLM/Ollama), local fallback when no API key.
 - `ai/prompts/prompts.py`, `ai/models/registry.py`.
 
+### 4b. Supported document types
+
+40+ formats, driven by `ALLOWED_FILE_TYPES` in `backend/.env` (default in `config/settings.py`):
+
+| Category | Extensions |
+|---|---|
+| Plain text | `txt md csv tsv json xml html yaml yml rtf log` |
+| Code | `py js ts java cpp c h hpp go rs rb php swift kt scala r sh bash sql css scss` |
+| Office | `pdf docx pptx xlsx odt` |
+| Images (OCR) | `png jpg jpeg bmp tif tiff webp` |
+
+- On upload, storage + background ingest, then chat retrieves from the extracted text.
+- **Scanned PDFs** (no text layer, <20 chars extracted) fall back to **RapidOCR** page-by-page (pymupdf render → OCR). Images are always OCR'd.
+- **Page-aware extraction** — `ai/chunking/text_extractor.py:extract_pages()` returns per-page text for PDFs, and the `document_worker` chunks each page separately, storing the 1-based `page_number` on every chunk. Formats without a page concept (text/code, Office) are a single page (`page_number = null`).
+- Extraction is lazy per type: text/code decode as UTF-8; Office uses python-docx/pptx/openpyxl; PDF uses pypdf (or PyMuPDF for OCR render); ODT via zipfile+xml.
+
 ### 5. Storage + queueing
 
-```bash
-cd backend
-pip install boto3
-```
-
-- `storage/s3/client.py` — S3 upload/download/delete/presigned URL.
-- `queueing/producer.py`, `queueing/consumer/__init__.py` — SQS publish/consume.
+- `storage/s3/client.py` — S3 upload/download/delete/presigned URL, with a local-disk fallback to `storage_local/` when `S3_BUCKET_NAME`/`AWS_ACCESS_KEY_ID` are unset (so uploads work with no AWS).
+- `queueing/producer.py` — SQS publish. Without `SQS_QUEUE_URL`, the document pipeline runs in a background thread on upload (`document_service.py:_process_background`), calling the same `workers/document_worker` ingest (extract → chunk → embed → store).
 
 ### 6. Workers
 
@@ -174,7 +201,9 @@ npx create-next-app@latest frontend --ts --tailwind --eslint --app --import-alia
 npm install axios
 ```
 
-The App Router scaffold generates `src/app/`, `tsconfig.json`, Tailwind/ESLint/PostCSS config, and a lint/build toolchain. Our typed files were layered on top under `src/`: `types/index.ts`, `services/api.ts` (axios) + `api-endpoints.ts`, `hooks/useAuth.ts`, `useChat.ts`, `useDocuments.ts`, `constants/app.ts`, `utils/helpers.ts`.
+The App Router scaffold generates `src/app/`, `tsconfig.json`, Tailwind/ESLint/PostCSS config, and a lint/build toolchain. Our typed files were layered on top under `src/`: `types/index.ts`, `services/api.ts` (axios) + `api-endpoints.ts`, `constants/app.ts`, `utils/helpers.ts`.
+
+Real UI pages live in `src/app/`: `login/page.tsx` (login/register) and `dashboard/page.tsx` (workspaces, document upload, RAG chat, clickable source citations with page-level file previews, doc status + delete, chat delete, log out); `/` redirects to `/login`.
 
 ```bash
 npm run dev       # http://localhost:3000
@@ -186,28 +215,48 @@ npx tsc --noEmit  # typecheck clean
 
 ```bash
 cd backend
-.\.venv\Scripts\python -m pytest -q        # 3 passed
+.\.venv\Scripts\python -m pytest -q        # 43 passed, ~77% coverage (needs DB on :5433)
 .\.venv\Scripts\python -m ruff check .     # clean
-.\.venv\Scripts\python -m ruff format .    # formatted
 ```
 
-Import smoke test confirmed all modules load and the app registers 18 routes. End-to-end verify (with a running DB): `register` → row in `users`, `login` → JWT, `GET /workspaces` with bearer → `200`.
+Integration tests hit a real Postgres test DB (`ai_knowledge_test` on :5433, set `TEST_DATABASE_URL` to override). Unit tests need no DB. `tests/test_text_extractor.py` covers page-aware extraction (single-page text, per-page PDF via PyMuPDF, unsupported-type errors).
+
+**E2E (Playwright)** — register → login → create workspace → chat:
+
+```bash
+cd frontend
+npm run test:e2e   # starts backend (:8000) + Next dev (:3100), then drives Chromium
+```
+
+`playwright.config.ts` auto-starts both servers (port 3000 is taken by a local Docker/WSL service on this machine, hence 3100); Chromium must be installed once via `npx playwright install chromium`. CORS in `backend/main.py` allows any localhost port, so the E2E frontend origin is accepted.
+
+**Load test** (k6, optional — `choco install k6` or grab a binary from grafana/k6):
+
+```bash
+k6 run load\load_test.js              # smoke + ramp to 20 VUs, p95 < 1000ms
+k6 run -e BASE_URL=http://host:port load\load_test.js   # against a deployed backend
+```
+
+Requires a pre-registered `load@testmail.dev` user (or edit the script to register one first). Thresholds: p95 < 1s, error rate < 1%.
 
 ### 10. API keys (`.env`)
 
-Keys for Groq, Mistral, OpenRouter, Gemini, NVIDIA live in `backend/.env`. Verified working: **Groq, Mistral, OpenRouter, Gemini**; NVIDIA key is valid (slow generation). `backend/.env` is gitignored — never commit it.
+AI provider keys are **optional** — set any of `GROQ_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `NVIDIA_API_KEY`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY` and the generator uses that provider; with no key set it returns a deterministic local fallback. Keys for Groq, Mistral, OpenRouter, Gemini, NVIDIA live in `backend/.env`. `backend/.env` is gitignored — never commit it.
 
 ### 11. Key settings fixes for local run
 
 - `settings.py` loads `backend/.env` **relative to the file**, not CWD — the backend runs from the repo root.
 - Docker DB uses `pgvector/pgvector:pg16` on host port **5433** ([5432 is taken by a local pgvector container]).
 - `docker compose down -v` once after a failed first boot to clear a corrupt init volume.
+- Schema is auto-provisioned on boot: `backend/main.py` lifespan runs `CREATE EXTENSION IF NOT EXISTS vector` + `Base.metadata.create_all`, so a fresh local DB works with only `DATABASE_URL` set.
 
 ---
 
 ## Running Locally
 
-### Option A — local (needs Postgres)
+### Option A — local (needs only a running Postgres)
+
+The whole app runs with just `DATABASE_URL` — no AWS keys, no Redis, no manual migration. The DB must be reachable (e.g. `docker compose up db` maps Postgres to host port 5433).
 
 ```powershell
 # Windows (works with a single command):
@@ -221,12 +270,15 @@ cd backend
 python -m virtualenv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env        # set DATABASE_URL, AWS keys
+cp .env.example .env        # required: DATABASE_URL (e.g. postgresql://postgres:postgres@localhost:5433/ai_knowledge)
+                            # optional: AI provider keys (GROQ_API_KEY, GEMINI_API_KEY, ...)
 cd ..                        # run from repo root (sibling packages ai/, storage/, ...)
 # NOTE: use `python -m uvicorn`, NOT bare `uvicorn` — the module form adds the
 # repo root to sys.path so `import backend.main` resolves.
 python -m uvicorn backend.main:app --app-dir backend --reload   # http://localhost:8000/docs
 ```
+
+On boot the schema is created automatically; uploads write to `storage_local/` and process in a background thread — chat then answers from your documents, and each cited source opens a preview of the exact page the answer came from.
 
 ```bash
 cd frontend

@@ -31,7 +31,8 @@ def retrieve_chunks(db: Session, workspace_id: str, query: str, top_k: int = 5) 
         if emb.embedding is None:
             continue
         score = _cosine(q, list(emb.embedding))
-        chunk._score = score  # noqa: SLF001
+        # np.float32 is not JSON-serializable for the sources column.
+        chunk._score = float(score)  # noqa: SLF001
         scored.append((score, chunk))
     scored.sort(key=lambda t: t[0], reverse=True)
     return [c for _, c in scored[:top_k]]

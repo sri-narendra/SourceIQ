@@ -17,7 +17,14 @@ class GeminiEmbedder:
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         genai = self._client()
-        result = genai.embed_content(model=self.model, content=texts)
+        if self.model == "text-embedding-004":
+            # text-embedding-004 defaults to 768 dims; the embeddings table is Vector(1536).
+            # gemini accepts output_dimensionality for this model, so pin it to match the schema.
+            result = genai.embed_content(
+                model=self.model, content=texts, output_dimensionality=1536
+            )
+        else:
+            result = genai.embed_content(model=self.model, content=texts)
         return [list(v) for v in result["embedding"]]
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
@@ -28,7 +35,13 @@ class OpenAIEmbedder:
     def __init__(self):
         from config.settings import settings
 
-        self.model = settings.embedding_model or "text-embedding-3-small"
+        # settings.embedding_model defaults to gemini's text-embedding-004, which is not
+        # an OpenAI model; fall back to an OpenAI-native 1536-dim model so dims match.
+        self.model = (
+            "text-embedding-3-small"
+            if settings.embedding_model == "text-embedding-004" or not settings.embedding_model
+            else settings.embedding_model
+        )
 
     def _client(self):
         import openai
