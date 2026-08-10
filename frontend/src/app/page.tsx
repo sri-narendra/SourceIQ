@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WarmUp from "@/components/WarmUp";
 
 const FORMATS = [
   "PDF", "PNG", "DOCX", "XLSX", "PPTX", "MD", "TXT",
@@ -18,6 +19,7 @@ const TICKER =
 export default function Home() {
   return (
     <div className="paper min-h-dvh text-foreground selection:bg-signal selection:text-background">
+      <WarmUp />
       <header className="sticky top-0 z-40 border-b-[3px] border-line bg-paper/90">
         <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center gap-6 px-6 py-4">
           <Link href="/" className="inline-block border-[3px] border-line bg-signal px-3 py-1 font-mono text-xl font-black tracking-tight text-background shadow-[5px_5px_0_0_var(--line)]">

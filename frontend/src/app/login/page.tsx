@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { authApi } from "@/services/api-endpoints";
+import WarmUp from "@/components/WarmUp";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function LoginPage() {
 
   return (
     <main className="paper flex min-h-dvh items-center justify-center p-6 text-foreground">
+      <WarmUp />
       <div className="w-full max-w-md">
         <Link href="/" className="inline-block border-[3px] border-line bg-signal px-3 py-1 font-mono text-lg font-black tracking-tight text-background shadow-[5px_5px_0_0_var(--line)]">
           Source<span className="text-ember">IQ</span><span className="ml-2 text-xs font-bold">auth</span>
